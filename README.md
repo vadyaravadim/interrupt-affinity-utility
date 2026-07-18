@@ -34,10 +34,10 @@ Zero install. Zero dependencies. Built-in undo.
 **One-liner** instead (in any PowerShell — it self-elevates):
 
 ```powershell
-irm https://raw.githubusercontent.com/vadyaravadim/interrupt-affinity-utility/main/interrupt-affinity-utility.ps1 -OutFile "$env:USERPROFILE\interrupt-affinity-utility.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\interrupt-affinity-utility.ps1"
+irm https://raw.githubusercontent.com/vadyaravadim/interrupt-affinity-utility/main/interrupt-affinity-utility.ps1 | iex
 ```
 
-The script is saved to your user profile (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback file is written next to it and must survive automatic temp cleanup.
+The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`.
 
 **Or clone:**
 

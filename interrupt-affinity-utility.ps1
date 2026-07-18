@@ -41,7 +41,48 @@ function Wait-IfElevatedWindow {
 trap {
     Write-Host "ERROR: $_" -ForegroundColor Red
     Wait-IfElevatedWindow
-    exit 1
+    # Under `irm | iex` this runs inside the user's own session, where `exit`
+    # would close their console - rethrow so only the piped script stops.
+    if ($PSCommandPath) { exit 1 }
+    break
+}
+
+# Mode switches forwarded on every relaunch (the irm|iex bootstrap rerun below
+# and the self-elevation later) - one list so neither path can silently drop one.
+function Get-ForwardedSwitchList {
+    $a = @()
+    if ($ShowAll) { $a += '-ShowAll' }
+    if ($Reset)   { $a += '-Reset' }
+    $a
+}
+
+# Launched via `irm <url> | iex` - no file on disk. The undo .reg files are
+# written next to the script, so a stable path is required: save the script to
+# the user profile (not TEMP - the undo files must survive automatic temp
+# cleanup) and rerun it from there (the rerun handles elevation).
+if (-not $PSCommandPath) {
+    # The piped text is not recoverable from inside iex ($MyInvocation there
+    # holds the caller's command line, not the script body) - download the
+    # script.
+    try {
+        $body = Invoke-RestMethod 'https://raw.githubusercontent.com/vadyaravadim/interrupt-affinity-utility/main/interrupt-affinity-utility.ps1' -TimeoutSec 30
+    } catch {
+        Write-Host "ERROR: could not download the script ($($_.Exception.Message)). Check your internet connection, or save the script to a file and run it from there." -ForegroundColor Red
+        return
+    }
+    $saved = Join-Path $env:USERPROFILE 'interrupt-affinity-utility.ps1'
+    if ((Test-Path $saved) -and ([IO.File]::ReadAllText($saved) -cne $body)) {
+        Copy-Item $saved "$saved.bak" -Force
+        Write-Host "Existing $saved differs - previous copy kept as $saved.bak" -ForegroundColor Yellow
+    }
+    [IO.File]::WriteAllText($saved, $body, [Text.Encoding]::UTF8)
+    Write-Host "Script saved to: $saved (the undo files will be written next to it)" -ForegroundColor Cyan
+    # @(): a single forwarded switch unrolls to a scalar, and splatting a
+    # scalar string breaks powershell.exe -File switch binding on PS 5.1.
+    $fwd = @(Get-ForwardedSwitchList)
+    powershell -NoProfile -ExecutionPolicy Bypass -File $saved @fwd
+    # The rerun's exit code stays in $LASTEXITCODE for scripted callers.
+    return
 }
 
 $principal = New-Object Security.Principal.WindowsPrincipal(
@@ -50,12 +91,12 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     Write-Host "Not running as Administrator. Requesting elevation..." -ForegroundColor Yellow
     try {
         $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass',
-                     '-File', "`"$PSCommandPath`"", '-Elevated')
-        if ($ShowAll) { $argList += '-ShowAll' }
-        if ($Reset)   { $argList += '-Reset' }
+                     '-File', "`"$PSCommandPath`"", '-Elevated') + (Get-ForwardedSwitchList)
         Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs
     } catch {
-        Write-Host "ERROR: elevation was refused. Run this script as Administrator." -ForegroundColor Red
+        # Not always a refusal (UAC service disabled, ...) - show the real cause.
+        Write-Host "ERROR: elevation failed ($($_.Exception.Message)). Run this script as Administrator." -ForegroundColor Red
+        Read-Host "Press Enter to close" | Out-Null
     }
     return
 }
