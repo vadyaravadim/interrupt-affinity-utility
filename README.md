@@ -58,7 +58,7 @@ cd interrupt-affinity-utility
 
 1. **Scans** PCI devices and shows the latency-critical ones (GPU, network, USB, audio) in a grid with their current affinity policy and assigned cores
 2. **Lets you pick cores** in a second grid — on hybrid CPUs (Intel 12th gen+) every logical CPU is labeled **P-Core** or **E-Core**, and HT/SMT siblings are visible via the physical core column
-3. **Backs up** the previous state of every selected device to a timestamped `affinity_undo_*.reg` file next to the script — **before** changing anything
+3. **Backs up** the previous state of every selected device to a timestamped `affinity_undo_*.reg` file next to the script — **before** changing anything — and records each device's very first pre-tool state in a cumulative `affinity_undo_original.reg`
 4. **Pins the interrupts** by writing the documented `DevicePolicy` / `AssignmentSetOverride` registry values
 
 Rollback = double-click the undo file, then restart the device or reboot. No System Restore needed — works from Safe Mode too.
@@ -103,6 +103,7 @@ HKLM\SYSTEM\CurrentControlSet\Enum\PCI\<device>\<instance>\Device Parameters\Int
 | 3 | AllProcessors | Any processor |
 | 4 | **SpecifiedProcessors** | **Only the processors in `AssignmentSetOverride`** — what this script sets |
 | 5 | SpreadMessages | Spread MSI-X messages across processors |
+| 6 | Steered (system) | Windows interrupt steering manages the processors dynamically — set by the system, not by tools |
 
 The script writes `DevicePolicy = 4` plus your core mask, and shows the current policy of every device in the grid — so a policy set earlier (by this script, GoInterruptPolicy, or a driver INF) is always visible before you change it.
 
@@ -129,10 +130,11 @@ This exact check is how the utility was validated on a Realtek 2.5GbE NIC (i9-14
 
 ## Reverting
 
-Two options:
+Three options:
 
-1. Double-click the `affinity_undo_*.reg` file created before your change, then restart the device or reboot (restores the previous state — including a policy written by another tool — and works from Safe Mode). If you ran the script several times against the same device, apply the undo files newest-to-oldest — each one is a snapshot of the state before *that* run, so only the oldest holds the original state.
-2. Run the script again with `-Reset` and select the same devices — this deletes `DevicePolicy` and `AssignmentSetOverride`, returning the device to the machine default. Note: if another tool had set a policy you want back, only the undo file restores it.
+1. Double-click the timestamped `affinity_undo_*.reg` file created before your change, then restart the device or reboot (restores the state before *that* run — including a policy written by another tool — and works from Safe Mode).
+2. Double-click `affinity_undo_original.reg` — a cumulative snapshot of the state each device had before this script *first* touched it, no matter how many runs happened since.
+3. Run the script again with `-Reset` and select the same devices — this deletes `DevicePolicy` and `AssignmentSetOverride`, returning the device to the machine default. Note: if another tool had set a policy you want back, only the undo files restore it.
 
 Prefer a System Restore point anyway? Create one yourself before running: `Checkpoint-Computer -Description "Before affinity"` (note: Windows silently skips it if a point was made within the last 24 hours).
 
@@ -156,7 +158,7 @@ For latency-critical devices: **P-cores**, and conventionally not CPU 0 (a lot o
 
 ### How is this different from GoInterruptPolicy?
 
-[GoInterruptPolicy](https://github.com/spddl/GoInterruptPolicy) is a solid GUI tool, but it ships as a compiled `.exe` — you run a binary and trust the build. This is a ~350-line PowerShell script you can read top to bottom before running, it filters the list down to latency-critical devices, labels P/E-cores on hybrid CPUs, and writes a `.reg` undo file before every change. It deliberately does *less*: no `DevicePriority`, no MSI toggles (that's [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility)'s job), no message-limit editing. Use whichever you prefer — this is the transparent, scriptable option.
+[GoInterruptPolicy](https://github.com/spddl/GoInterruptPolicy) is a solid GUI tool, but it ships as a compiled `.exe` — you run a binary and trust the build. This is a ~400-line PowerShell script you can read top to bottom before running, it filters the list down to latency-critical devices, labels P/E-cores on hybrid CPUs, and writes a `.reg` undo file before every change. It deliberately does *less*: no `DevicePriority`, no MSI toggles (that's [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility)'s job), no message-limit editing. Use whichever you prefer — this is the transparent, scriptable option.
 
 ### How is this different from the Microsoft Interrupt-Affinity Policy Tool (IntPolicy)?
 

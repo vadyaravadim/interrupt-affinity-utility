@@ -16,12 +16,11 @@
 .NOTES
     Restart the device (disable/enable in Device Manager) or reboot for
     changes to take effect.
-    Revert: apply the affinity_undo_*.reg file written before each change.
-    Each undo file is a per-run snapshot: after several runs touching the
-    same device, apply them newest-to-oldest - only the oldest file holds
-    the original state.
+    Revert: apply the affinity_undo_<stamp>.reg file written before each
+    change to revert that run, or affinity_undo_original.reg to restore the
+    state each device had before this tool first touched it.
     (-Reset deletes both values; if another tool wrote a policy you want
-    back, only the undo file restores it.)
+    back, only the undo files restore it.)
 #>
 [CmdletBinding()]
 param(
@@ -79,6 +78,10 @@ $IncludeClassGuids = @(
     '{36fc9e60-c465-11cf-8056-444553540000}'   # USB host controllers
 )
 
+# Audio bus controllers register under the System class, not Media; matched
+# by their locale-invariant bus service names (HD Audio, Intel SST).
+$AudioBusServices = @('HDAudBus', 'IntcAudioBus')
+
 $PolicyNames = @{
     0 = 'MachineDefault'
     1 = 'AllCloseProcessors'
@@ -93,10 +96,11 @@ function Get-DeviceName {
     param([Microsoft.Win32.RegistryKey]$Key)
     $fn = $Key.GetValue('FriendlyName')
     if ([string]::IsNullOrWhiteSpace($fn)) { $fn = $Key.GetValue('DeviceDesc') }
-    if ($fn -and $fn -match ';') {
-        # Strip the @res;Text prefix; keep the raw string if nothing follows ';'
-        # (a malformed indirect string) so the device stays visible.
-        $text = $fn.Split(';')[-1]
+    if ($fn -and $fn -match '^@') {
+        # Indirect string "@file,resid;Text": the text is everything after the
+        # FIRST ';' and may itself contain ';'. Keep the raw string if nothing
+        # follows ';' (a malformed indirect string) so the device stays visible.
+        $text = ($fn -split ';', 2)[1]
         if (-not [string]::IsNullOrWhiteSpace($text)) { $fn = $text }
     }
     return $fn
@@ -115,18 +119,25 @@ public static class CpuSets {
         IntPtr information, uint bufferLength, out uint returnedLength, IntPtr process, uint flags);
 }
 '@
-    $len = [uint32]0
-    [void][CpuSets]::GetSystemCpuSetInformation([IntPtr]::Zero, 0, [ref]$len, [IntPtr]::Zero, 0)
-    if ($len -eq 0) { throw "GetSystemCpuSetInformation returned no data" }
-    $buf = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$len)
-    try {
-        if (-not [CpuSets]::GetSystemCpuSetInformation($buf, $len, [ref]$len, [IntPtr]::Zero, 0)) {
-            throw "GetSystemCpuSetInformation failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    # Probe size, then fetch; re-probe if the topology grew in between
+    # (CPU hot-add on a VM) instead of dying on ERROR_INSUFFICIENT_BUFFER.
+    $bytes = $null
+    while ($null -eq $bytes) {
+        $len = [uint32]0
+        [void][CpuSets]::GetSystemCpuSetInformation([IntPtr]::Zero, 0, [ref]$len, [IntPtr]::Zero, 0)
+        if ($len -eq 0) { throw "GetSystemCpuSetInformation returned no data" }
+        $buf = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$len)
+        try {
+            if ([CpuSets]::GetSystemCpuSetInformation($buf, $len, [ref]$len, [IntPtr]::Zero, 0)) {
+                $bytes = New-Object byte[] $len
+                [Runtime.InteropServices.Marshal]::Copy($buf, $bytes, 0, [int]$len)
+            } else {
+                $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                if ($err -ne 122) { throw "GetSystemCpuSetInformation failed: $err" }   # 122 = ERROR_INSUFFICIENT_BUFFER
+            }
+        } finally {
+            [Runtime.InteropServices.Marshal]::FreeHGlobal($buf)
         }
-        $bytes = New-Object byte[] $len
-        [Runtime.InteropServices.Marshal]::Copy($buf, $bytes, 0, [int]$len)
-    } finally {
-        [Runtime.InteropServices.Marshal]::FreeHGlobal($buf)
     }
     # SYSTEM_CPU_SET_INFORMATION (x64): Size u32 @0, Type u32 @4, Group u16 @12,
     # LogicalProcessorIndex u8 @14, CoreIndex u8 @15, EfficiencyClass u8 @18
@@ -167,7 +178,9 @@ function ConvertTo-CoreList {
 }
 
 # AssignmentSetOverride may be REG_BINARY (little endian), REG_DWORD or
-# REG_QWORD - all documented; normalize to a uint64 mask.
+# REG_QWORD - all documented; normalize to a uint64 mask. $null = a foreign
+# value in a type this tool cannot read, so the caller can surface it
+# instead of showing it as "no override".
 function ConvertTo-Mask {
     param($Value)
     if ($Value -is [byte[]]) {
@@ -177,7 +190,12 @@ function ConvertTo-Mask {
     }
     if ($Value -is [int])  { return [BitConverter]::ToUInt32([BitConverter]::GetBytes($Value), 0) }
     if ($Value -is [long]) { return [BitConverter]::ToUInt64([BitConverter]::GetBytes($Value), 0) }
-    return [uint64]0
+    return $null
+}
+
+function ConvertTo-HexPairs {
+    param([byte[]]$Bytes)
+    ($Bytes | ForEach-Object { '{0:x2}' -f $_ }) -join ','
 }
 
 # One .reg line restoring a value in its ORIGINAL registry type, or deleting
@@ -187,14 +205,19 @@ function Get-UndoLine {
     if ($null -eq $Key -or $Name -notin $Key.GetValueNames()) { return "`"$Name`"=-" }
     $raw = $Key.GetValue($Name, $null, 'DoNotExpandEnvironmentNames')
     switch ($Key.GetValueKind($Name)) {
-        'DWord'  { return ('"{0}"=dword:{1:x8}' -f $Name,
-                   [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$raw), 0)) }
-        'QWord'  { return ('"{0}"=hex(b):{1}' -f $Name,
-                   (([BitConverter]::GetBytes([long]$raw) | ForEach-Object { '{0:x2}' -f $_ }) -join ',')) }
-        'Binary' { return ('"{0}"=hex:{1}' -f $Name,
-                   (($raw | ForEach-Object { '{0:x2}' -f $_ }) -join ',')) }
-        # Any other type here is broken config; deleting it restores the default.
-        default  { return "`"$Name`"=-" }
+        'DWord'        { return ('"{0}"=dword:{1:x8}' -f $Name,
+                         [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$raw), 0)) }
+        'QWord'        { return ('"{0}"=hex(b):{1}' -f $Name,
+                         (ConvertTo-HexPairs ([BitConverter]::GetBytes([long]$raw)))) }
+        'Binary'       { return ('"{0}"=hex:{1}' -f $Name, (ConvertTo-HexPairs $raw)) }
+        'String'       { return ('"{0}"="{1}"' -f $Name,
+                         $raw.Replace('\', '\\').Replace('"', '\"')) }
+        'ExpandString' { return ('"{0}"=hex(2):{1}' -f $Name,
+                         (ConvertTo-HexPairs ([Text.Encoding]::Unicode.GetBytes("$raw`0")))) }
+        'MultiString'  { return ('"{0}"=hex(7):{1}' -f $Name,
+                         (ConvertTo-HexPairs ([Text.Encoding]::Unicode.GetBytes((($raw -join "`0") + "`0`0"))))) }
+        # REG_NONE / unknown kinds have no .reg literal; deleting restores the default.
+        default        { return "`"$Name`"=-" }
     }
 }
 
@@ -213,11 +236,9 @@ foreach ($devClass in Get-ChildItem $pciRoot -ErrorAction SilentlyContinue) {
         if (-not (Test-Path $imPath)) { continue }
 
         if (-not $ShowAll) {
-            # HD Audio controllers register under the System class, not Media;
-            # their locale-invariant marker is the HDAudBus service.
             $classGuid = $inst.GetValue('ClassGUID')
             if ($classGuid -notin $IncludeClassGuids -and
-                $inst.GetValue('Service') -ne 'HDAudBus') { $hidden++; continue }
+                $inst.GetValue('Service') -notin $AudioBusServices) { $hidden++; continue }
         }
 
         # Absent key/values = no override: the OS picks the processors.
@@ -227,11 +248,17 @@ foreach ($devClass in Get-ChildItem $pciRoot -ErrorAction SilentlyContinue) {
             $apKey = Get-Item $apPath
             $dp = $apKey.GetValue('DevicePolicy')
             if ($null -ne $dp) {
-                $policy = $PolicyNames[[int]$dp]
-                if (-not $policy) { $policy = "Unknown ($dp)" }
+                # -as: a foreign value (REG_SZ, out-of-range QWORD) must show as
+                # Unknown, not abort the whole scan via the trap.
+                $dpInt = $dp -as [int]
+                $policy = if ($null -ne $dpInt -and $PolicyNames[$dpInt]) { $PolicyNames[$dpInt] }
+                          else { "Unknown ($dp)" }
             }
             $aso = $apKey.GetValue('AssignmentSetOverride')
-            if ($null -ne $aso) { $cores = ConvertTo-CoreList -Mask (ConvertTo-Mask $aso) }
+            if ($null -ne $aso) {
+                $m = ConvertTo-Mask $aso
+                $cores = if ($null -ne $m) { ConvertTo-CoreList -Mask $m } else { "Unreadable ($aso)" }
+            }
         }
 
         $rows.Add([PSCustomObject]@{
@@ -277,16 +304,17 @@ if (-not $Reset) {
     }
     # Higher efficiency class = performance core (Intel hybrid: P=1, E=0).
     $maxClass = ($cpus | Measure-Object EffClass -Maximum).Maximum
-    $smtCores = $cpus | Group-Object Core | Where-Object Count -gt 1 | ForEach-Object { $_.Name }
+    $hasSmt = [bool]($cpus | Group-Object Core | Where-Object Count -gt 1)
     $coreRows = foreach ($c in $cpus) {
-        [PSCustomObject]@{
-            CPU          = $c.CPU
-            Type         = if ($maxClass -eq 0) { 'Core' }
-                           elseif ($c.EffClass -eq $maxClass) { 'P-Core' } else { 'E-Core' }
-            PhysicalCore = $c.Core   # two CPUs sharing one PhysicalCore = SMT/HT pair
+        $row = [ordered]@{
+            CPU  = $c.CPU
+            Type = if ($maxClass -eq 0) { 'Core' }
+                   elseif ($c.EffClass -eq $maxClass) { 'P-Core' } else { 'E-Core' }
         }
+        # Two CPUs sharing one PhysicalCore = SMT/HT pair; column only shown then.
+        if ($hasSmt) { $row['PhysicalCore'] = $c.Core }
+        [PSCustomObject]$row
     }
-    if (-not $smtCores) { $coreRows = $coreRows | Select-Object CPU, Type }
 
     $picked = $coreRows | Sort-Object CPU |
         Out-GridView -Title "Select CPU core(s) to handle interrupts of $(@($selected).Count) device(s)" -PassThru
@@ -300,7 +328,10 @@ if (-not $Reset) {
 }
 
 # Lightweight rollback: record the CURRENT state of every selected key into a
-# .reg file BEFORE changing anything. Double-clicking it reverts everything.
+# per-run .reg file BEFORE changing anything (double-clicking it reverts this
+# run), and append the same stanza to a cumulative first-touch file that keeps
+# the state each device had before this tool EVER touched it - applying that
+# one file restores the original state no matter how many runs happened since.
 # Undo is value-level on purpose: a "[-key]" stanza would also wipe values the
 # tool never wrote (e.g. DevicePriority set by a driver or another tweak);
 # deleting the values may leave an empty key behind, which is harmless.
@@ -310,20 +341,28 @@ $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $undoFile = Join-Path $PSScriptRoot "affinity_undo_$stamp.reg"
 $n = 1
 while (Test-Path $undoFile) { $undoFile = Join-Path $PSScriptRoot ("affinity_undo_{0}_{1}.reg" -f $stamp, $n++) }
+$origFile = Join-Path $PSScriptRoot 'affinity_undo_original.reg'
+if (-not (Test-Path $origFile)) {
+    Set-Content -Path $origFile -Value "Windows Registry Editor Version 5.00`r`n" -Encoding Unicode
+}
+$origText = Get-Content $origFile -Raw
 $undo = New-Object System.Text.StringBuilder
 [void]$undo.AppendLine('Windows Registry Editor Version 5.00')
 [void]$undo.AppendLine('')
+$origAdd = New-Object System.Text.StringBuilder
 foreach ($d in $selected) {
     # Provider path -> raw path for the .reg format
     $raw = $d.RegPath -replace '^.*Registry::', ''
     $apKey = if (Test-Path $d.RegPath) { Get-Item $d.RegPath } else { $null }
-    [void]$undo.AppendLine("[$raw]")
-    [void]$undo.AppendLine((Get-UndoLine -Key $apKey -Name 'DevicePolicy'))
-    [void]$undo.AppendLine((Get-UndoLine -Key $apKey -Name 'AssignmentSetOverride'))
-    [void]$undo.AppendLine('')
+    $stanza = "[$raw]`r`n" +
+              (Get-UndoLine -Key $apKey -Name 'DevicePolicy') + "`r`n" +
+              (Get-UndoLine -Key $apKey -Name 'AssignmentSetOverride') + "`r`n"
+    [void]$undo.AppendLine($stanza)
+    if (-not $origText.Contains("[$raw]")) { [void]$origAdd.AppendLine($stanza) }
 }
 Set-Content -Path $undoFile -Value $undo.ToString() -Encoding Unicode
-Write-Host "Undo file saved: $undoFile (double-click it to revert, then restart the device or reboot)" -ForegroundColor Cyan
+if ($origAdd.Length) { Add-Content -Path $origFile -Value $origAdd.ToString() -Encoding Unicode }
+Write-Host "Undo files: $undoFile (reverts this run); $origFile (restores the pre-tool state)" -ForegroundColor Cyan
 
 $updated = 0
 $failed  = 0
@@ -337,7 +376,7 @@ foreach ($d in $selected) {
             Write-Host ("  [RESET] {0}" -f $d.Name) -ForegroundColor Green
         } else {
             if (-not (Test-Path $d.RegPath)) {
-                New-Item -Path $d.RegPath -Force | Out-Null      # create subkey if absent
+                New-Item -Path $d.RegPath -Force | Out-Null
             }
             # DevicePolicy 4 = IrqPolicySpecifiedProcessors; the mask is only
             # honored with this policy. REG_BINARY little endian, as documented.
