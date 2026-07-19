@@ -1,3 +1,35 @@
+<#PSScriptInfo
+
+.VERSION 1.0.0
+
+.GUID 3b047844-89f8-4d9e-a386-64d9af75161c
+
+.AUTHOR vadyaravadim
+
+.COMPANYNAME
+
+.COPYRIGHT
+
+.TAGS Windows Windows10 Windows11 Gaming InterruptAffinity IRQ DPC Latency MSI PCI Performance Tweak
+
+.LICENSEURI https://github.com/vadyaravadim/interrupt-affinity-utility/blob/main/LICENSE
+
+.PROJECTURI https://github.com/vadyaravadim/interrupt-affinity-utility
+
+.ICONURI
+
+.EXTERNALMODULEDEPENDENCIES
+
+.REQUIREDSCRIPTS
+
+.EXTERNALSCRIPTDEPENDENCIES
+
+.RELEASENOTES
+
+.PRIVATEDATA
+
+#>
+
 <#
 .SYNOPSIS
     Interrupt affinity policy manager for PCI devices.
