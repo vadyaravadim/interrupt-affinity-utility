@@ -7,10 +7,12 @@
 An open-source PowerShell script to view and set the **interrupt affinity policy** of PCI devices on Windows 10/11 — a transparent alternative to GoInterruptPolicy and the retired Microsoft Interrupt-Affinity Policy Tool.
 Zero install. Zero dependencies. Built-in undo.
 
+[![lint](https://img.shields.io/github/actions/workflow/status/vadyaravadim/interrupt-affinity-utility/lint.yml?label=lint&logo=powershell)](https://github.com/vadyaravadim/interrupt-affinity-utility/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows)](https://www.microsoft.com/windows)
-[![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE?logo=powershell&logoColor=white)](https://docs.microsoft.com/en-us/powershell/)
-![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/interrupt-affinity-utility?style=social)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://docs.microsoft.com/en-us/powershell/)
+[![Latest release](https://img.shields.io/github/v/release/vadyaravadim/interrupt-affinity-utility)](https://github.com/vadyaravadim/interrupt-affinity-utility/releases)
+![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/=social)
 
 </div>
 
