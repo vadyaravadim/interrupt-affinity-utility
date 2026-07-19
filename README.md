@@ -12,6 +12,7 @@ Zero install. Zero dependencies. Built-in undo.
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows)](https://www.microsoft.com/windows)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://docs.microsoft.com/en-us/powershell/)
 [![Latest release](https://img.shields.io/github/v/release/vadyaravadim/interrupt-affinity-utility)](https://github.com/vadyaravadim/interrupt-affinity-utility/releases)
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/interrupt-affinity-utility?logo=powershell&label=PS%20Gallery)](https://www.powershellgallery.com/packages/interrupt-affinity-utility)
 ![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/interrupt-affinity-utility?style=social)
 
 </div>
@@ -32,6 +33,16 @@ Zero install. Zero dependencies. Built-in undo.
 4. In the first grid, `Ctrl`-click the devices you want, then click **OK**.
 5. In the second grid, `Ctrl`-click the CPU core(s) that should service their interrupts, then click **OK**.
 6. **Restart the device** (disable/enable in Device Manager) or reboot.
+
+**Or from the PowerShell Gallery:**
+
+```powershell
+Install-Script interrupt-affinity-utility
+interrupt-affinity-utility           # then run it by name (open a NEW PowerShell window first, so the Scripts folder is on PATH)
+interrupt-affinity-utility -ShowAll  # switches work directly: -ShowAll, -Reset
+```
+
+The script self-elevates. Update later with `Update-Script interrupt-affinity-utility`.
 
 **One-liner** instead (in any PowerShell — it self-elevates):
 
