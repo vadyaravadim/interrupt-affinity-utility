@@ -25,16 +25,7 @@ Zero install. Zero dependencies. Built-in undo.
 
 ## Quick Start
 
-**Easiest — download & double-click:**
-
-1. Click **Code ▸ Download ZIP** at the top of this page, then unzip.
-2. Double-click **`Run.bat`**.
-3. Click **Yes** on the UAC prompt (the script requests admin rights on its own).
-4. In the first grid, `Ctrl`-click the devices you want, then click **OK**.
-5. In the second grid, `Ctrl`-click the CPU core(s) that should service their interrupts, then click **OK**.
-6. **Restart the device** (disable/enable in Device Manager) or reboot.
-
-**Or from the PowerShell Gallery:**
+**Easiest — from the PowerShell Gallery:**
 
 ```powershell
 Install-Script interrupt-affinity-utility
@@ -59,6 +50,17 @@ git clone https://github.com/vadyaravadim/interrupt-affinity-utility.git
 cd interrupt-affinity-utility
 .\Run.bat
 ```
+
+**Or download the ZIP** (no PowerShell needed): click **Code ▸ Download ZIP** at the top of this page, unzip, then double-click **`Run.bat`**.
+
+### Using the picker
+
+However you launch it:
+
+1. Click **Yes** on the UAC prompt (the script requests admin rights on its own).
+2. In the first grid, `Ctrl`-click the devices you want, then click **OK**.
+3. In the second grid, `Ctrl`-click the CPU core(s) that should service their interrupts, then click **OK**.
+4. **Restart the device** (disable/enable in Device Manager) or reboot.
 
 ### Optional switches
 
