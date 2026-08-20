@@ -1,0 +1,61 @@
+# Interrupt Affinity Utility
+
+A single self-contained PowerShell script (`interrupt-affinity-utility.ps1`) that pins PCI device
+interrupts to chosen CPU cores through the documented `DevicePolicy` / `AssignmentSetOverride` values,
+driven by two `Out-GridView` pickers. Part of a family of six single-script Windows tuning tools that share
+this layout: one `.ps1`, `Run.bat`, `PSScriptAnalyzerSettings.psd1`, and the same three workflows.
+
+**`Out-GridView` is a hard dependency and the check for it stays up front.** PowerShell 7 ships without it
+and Server Core has none at all; failing early with instructions beats a raw `CommandNotFound` thrown
+halfway through a scan the user already waited on.
+
+## Invariants the undo files depend on
+
+- **Two undo files, and they are not redundant.** `affinity_undo_<stamp>.reg` reverts one run;
+  `affinity_undo_original.reg` is cumulative and records a device's state the FIRST time this tool touches
+  it, so it stays the only file that restores the pre-tool state after several runs. Do not "simplify" it
+  into a per-run rewrite.
+- **Values round-trip in their original registry type** (`ConvertTo-HexPairs` -> `hex(2)` / `hex(7)`).
+  Another tool may have left a String / ExpandString / MultiString where a DWORD is expected, and the
+  revert has to restore what was actually there.
+- **A foreign value degrades the row, never the scan.** A non-numeric or oversized `DevicePolicy` renders
+  as `Unknown (...)`; an `AssignmentSetOverride` in an unreadable type renders as `Unreadable (...)`.
+  Reporting an unreadable override as "no override" would be the dangerous failure - it reads as a device
+  the tool may freely take over.
+- **`Get-ForwardedSwitchList` is the ONE place mode switches are listed.** Both relaunch paths - the
+  `irm | iex` bootstrap rerun and the UAC elevation - build their argument list from it, so neither can
+  silently drop `-ShowAll` or `-Reset`. Splat it as `@(...)`: on PS 5.1 a single forwarded switch unrolls
+  to a scalar string and breaks `powershell.exe -File` switch binding.
+- **A piped run saves the script into the user profile, not `%TEMP%`.** The undo files are written next to
+  the script, so they have to sit somewhere that survives automatic temp cleanup.
+- `Get-CpuTopology` re-probes the buffer size on `ERROR_INSUFFICIENT_BUFFER` - CPU hot-add on a VM changes
+  it between the two calls.
+
+## The two CI gates
+
+- **`ascii-check.yml` - the .ps1 must be pure ASCII with no BOM.** Both halves are load-bearing: a BOM
+  makes `irm | iex` choke on a leading U+FEFF, and non-ASCII in a BOM-less file turns into mojibake when
+  Windows PowerShell 5.1 runs it with `-File`. Write `\uXXXX` regex escapes rather than literals; em-dashes
+  and typographic quotes are the usual way this reds. Only the `.ps1` is checked - Markdown is free.
+- **`lint.yml` - PSScriptAnalyzer over the whole repo, Error + Warning, any finding fails.** Suppressions
+  live in `PSScriptAnalyzerSettings.psd1` with the reason written next to each rule. Extend that file with
+  a justification instead of adding an inline suppression attribute.
+
+## Release - the tag is the only source of truth
+
+`git tag vX.Y.Z && git push origin vX.Y.Z` runs `release.yml`, which stamps the tag into `.VERSION`, hashes
+the script, attests build provenance, creates the GitHub Release and publishes to the PowerShell Gallery.
+Nothing ships from a push to `main`.
+
+**Before tagging, move the `## [Unreleased]` bullets in `CHANGELOG.md` into a `## [X.Y.Z] - YYYY-MM-DD`
+section and add the compare link at the bottom.** The release job copies exactly that section into the
+release body and **fails the release when the tag's section is missing**. This is a gate on purpose, not a
+fallback: notes are hand-written because GitHub's `--generate-notes` lists merged PRs, and this repo lands
+nearly everything as direct commits to `main`, so it published releases whose whole body was a compare
+link.
+
+Write the entries for someone who runs the tool, not for someone reading the diff: what changed on their
+machine and why it matters. A fix says what was broken and what it cost them.
+
+Do NOT bump `.VERSION` in the `.ps1` by hand - it is a placeholder the workflow overwrites, and a
+hand-edited value that disagrees with the tag would only mislead whoever reads the committed file.
