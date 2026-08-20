@@ -38,10 +38,11 @@ verbatim into the release and fails the release if the tag has no section here.
 
 ### Added
 
-- First release. Lists your PCI devices with their current interrupt affinity policy in a grid, then pins
-  the interrupts of the devices you pick to the cores you pick in a second grid - P-cores and E-cores are
-  labeled on hybrid CPUs. It writes the documented `DevicePolicy` / `AssignmentSetOverride` values and
-  nothing else.
+- First release. Lists the latency-critical PCI devices - GPU, network, USB and audio controllers - with
+  their current interrupt affinity policy in a grid, then pins the interrupts of the devices you pick to
+  the cores you pick in a second grid. P-cores and E-cores are labeled on hybrid CPUs, and on an SMT CPU a
+  physical-core column shows which logical processors are siblings of the same core. It writes the
+  documented `DevicePolicy` / `AssignmentSetOverride` values and nothing else.
 - `-Reset` removes the override from the selected devices and restores the machine default; `-ShowAll`
   includes the bridges and abstract controllers that are hidden by default.
 - Two undo files, written before any change: `affinity_undo_<stamp>.reg` reverts that one run, and the
@@ -58,8 +59,12 @@ verbatim into the release and fails the release if the tag has no section here.
 - Intel SST audio controllers (`IntcAudioBus`) are in the default device list, not just under `-ShowAll`.
 - Reports a clear, up-front error when `Out-GridView` is unavailable - PowerShell 7 ships without it and
   Server Core has none at all - instead of failing halfway through the run.
-- Self-elevates through UAC and keeps the elevated window open on both success and error. Zero external
-  dependencies, Windows PowerShell 5.1+.
+- Self-elevates through UAC and keeps the elevated window open on both success and error. Runs on Windows
+  10 and Windows 11 with Windows PowerShell 5.1 or newer, and depends on nothing outside Windows.
+- Validated on Windows 11 with Windows PowerShell 5.1 before release: 43 function-level tests plus a full
+  elevated end-to-end run - pin, an external change made behind the tool's back, re-pin, apply the per-run
+  undo, apply the original undo, then reset - including a real `reg.exe import` round-trip of every value
+  type.
 
 [Unreleased]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.1...HEAD
 [1.0.1]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.0...v1.0.1
