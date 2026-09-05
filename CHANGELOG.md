@@ -9,6 +9,8 @@ verbatim into the release and fails the release if the tag has no section here.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-05
+
 ### Fixed
 
 - The copy a piped `irm ... | iex` run saves into your user profile was written with a UTF-8 BOM, which
@@ -66,6 +68,7 @@ verbatim into the release and fails the release if the tag has no section here.
   undo, apply the original undo, then reset - including a real `reg.exe import` round-trip of every value
   type.
 
-[Unreleased]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/vadyaravadim/interrupt-affinity-utility/releases/tag/v1.0.0
