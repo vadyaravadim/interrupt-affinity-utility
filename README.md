@@ -15,6 +15,8 @@ Zero install. Zero dependencies. Built-in undo.
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/interrupt-affinity-utility?logo=powershell&label=PS%20Gallery)](https://www.powershellgallery.com/packages/interrupt-affinity-utility)
 ![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/interrupt-affinity-utility?style=social)
 
+**Part of [RigPolice](https://rigpolice.com/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility) — check your mouse's real polling rate after the change with the free [Polling Rate Test](https://rigpolice.com/mouse/tests/polling-rate-test/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility)**
+
 </div>
 
 ---
