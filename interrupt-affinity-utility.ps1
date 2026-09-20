@@ -1,6 +1,6 @@
 <#PSScriptInfo
 
-.VERSION 1.0.0
+.VERSION 0.0.0
 
 .GUID 3b047844-89f8-4d9e-a386-64d9af75161c
 
@@ -97,7 +97,7 @@ if (-not $PSCommandPath) {
     # holds the caller's command line, not the script body) - download the
     # script.
     try {
-        $body = Invoke-RestMethod 'https://raw.githubusercontent.com/vadyaravadim/interrupt-affinity-utility/main/interrupt-affinity-utility.ps1' -TimeoutSec 30
+        $body = Invoke-RestMethod 'https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1' -TimeoutSec 30
     } catch {
         Write-Host "ERROR: could not download the script ($($_.Exception.Message)). Check your internet connection, or save the script to a file and run it from there." -ForegroundColor Red
         return
@@ -135,10 +135,22 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     return
 }
 
-# PowerShell 7 ships without Out-GridView (Server Core has none at all);
-# fail up front with instructions instead of a raw CommandNotFound mid-run.
+# Read from this file's own PSScriptInfo block - the one place the version
+# lives (release.yml stamps the tag into it). 0.0.0 is the committed
+# placeholder: a clone or ZIP of main, not a release.
+$version = [regex]::Match((Get-Content $PSCommandPath -Raw), '(?m)^\.VERSION\s+(\S+)').Groups[1].Value
+$version = if ($version -eq '0.0.0') { 'dev build' } else { "v$version" }
+
+Write-Host ""
+Write-Host "===================================" -ForegroundColor Cyan
+Write-Host "  INTERRUPT AFFINITY UTILITY $version" -ForegroundColor Cyan
+Write-Host "===================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Out-GridView exists only on Windows editions with a desktop - Server Core has
+# none; fail up front with instructions instead of a raw CommandNotFound mid-run.
 if (-not (Get-Command Out-GridView -ErrorAction SilentlyContinue)) {
-    Write-Host "Out-GridView is not available in this PowerShell. Run the script with Windows PowerShell (powershell.exe), or install the Microsoft.PowerShell.GraphicalTools module." -ForegroundColor Red
+    Write-Host "Out-GridView is not available in this PowerShell. It needs a Windows edition with a desktop (not Server Core); on a desktop edition, run the script with Windows PowerShell (powershell.exe)." -ForegroundColor Red
     Wait-IfElevatedWindow
     return
 }

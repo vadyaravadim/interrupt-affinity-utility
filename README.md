@@ -40,10 +40,10 @@ The script self-elevates. Update later with `Update-Script interrupt-affinity-ut
 **One-liner** instead (in any PowerShell — it self-elevates):
 
 ```powershell
-irm https://raw.githubusercontent.com/vadyaravadim/interrupt-affinity-utility/main/interrupt-affinity-utility.ps1 | iex
+irm https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1 | iex
 ```
 
-The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`.
+The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`. The `irm | iex` pipe itself takes no switches - run the saved copy instead, see [Optional switches](#optional-switches).
 
 **Or clone:**
 
@@ -71,6 +71,16 @@ However you launch it:
 | `-ShowAll` | Show every PCI device with interrupt settings, including bridges/controllers hidden by default |
 | `-Reset` | Remove the affinity override from the selected devices (restore the machine default) |
 
+How to pass a switch depends on how you got the script:
+
+| Installed via | Command |
+|---------------|---------|
+| PowerShell Gallery | `interrupt-affinity-utility -ShowAll` |
+| ZIP or clone | `.\Run.bat -ShowAll` from the script's folder |
+| One-liner | `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\interrupt-affinity-utility.ps1" -ShowAll` |
+
+Calling `.\interrupt-affinity-utility.ps1` directly only works if your execution policy allows scripts — Windows blocks them by default, which is what `Run.bat` and `-ExecutionPolicy Bypass` get around.
+
 ## What It Does
 
 1. **Scans** PCI devices and shows the latency-critical ones (GPU, network, USB, audio) in a grid with their current affinity policy and assigned cores
@@ -97,7 +107,7 @@ It is also the standard server-side technique for network scaling — Microsoft 
 | | |
 |---|---|
 | **Windows** | 10, 11 (64-bit, up to 64 logical processors) |
-| **PowerShell** | Windows PowerShell 5.1 (ships with Windows 10/11). Uses `Out-GridView` — built into Windows PowerShell 5.1; PowerShell 7 needs the `Microsoft.PowerShell.GraphicalTools` module; **not** available on Server Core. The script detects a missing `Out-GridView` and tells you what to do |
+| **PowerShell** | Windows PowerShell 5.1 (ships with Windows 10/11); PowerShell 7 works too. Uses `Out-GridView`, which both have on Windows editions with a desktop and which is **not** available on Server Core. The script detects a missing `Out-GridView` and tells you what to do |
 | **Rights** | Administrator (the script self-elevates via UAC) |
 
 ## How It Works
@@ -151,7 +161,7 @@ Three options:
 
 1. Double-click the timestamped `affinity_undo_*.reg` file created before your change, then restart the device or reboot (restores the state before *that* run — including a policy written by another tool — and works from Safe Mode).
 2. Double-click `affinity_undo_original.reg` — a cumulative snapshot of the state each device had before this script *first* touched it, no matter how many runs happened since.
-3. Run the script again with `-Reset` and select the same devices — this deletes `DevicePolicy` and `AssignmentSetOverride`, returning the device to the machine default. Note: if another tool had set a policy you want back, only the undo files restore it.
+3. Run the script again with `-Reset` (`.\Run.bat -Reset` from a ZIP or clone; [other install methods](#optional-switches) pass the switch differently) and select the same devices — this deletes `DevicePolicy` and `AssignmentSetOverride`, returning the device to the machine default. Note: if another tool had set a policy you want back, only the undo files restore it.
 
 Prefer a System Restore point anyway? Create one yourself before running: `Checkpoint-Computer -Description "Before affinity"` (note: Windows silently skips it if a point was made within the last 24 hours).
 
