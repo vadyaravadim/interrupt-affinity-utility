@@ -1,0 +1,52 @@
+name: Bug report
+description: The script failed, printed an error, or a device's interrupts did not move to the pinned cores / the policy did not stick.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Not a bug:** cores that seem to change nothing because the device was not restarted yet or because RSS keeps a NIC's receive DPCs on its own CPUs, NVMe drives missing from the list (hidden on purpose - use `-ShowAll`), or no FPS change after pinning - all three are explained in the [FAQ](https://github.com/vadyaravadim/interrupt-affinity-utility#faq).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: run-output
+    attributes:
+      label: Output of the run
+      description: |
+        Everything the elevated window printed, from the `INTERRUPT AFFINITY UTILITY vX.Y.Z` banner down, including any red ERROR line - the banner says which version you ran. If the window closed before you could copy it, run the script again from a console so the output stays, and cancel the device picker if you do not want to change anything:
+        - PowerShell Gallery: `interrupt-affinity-utility`
+        - One-liner: `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\interrupt-affinity-utility.ps1"`
+        - ZIP / clone, from the script's folder: `powershell -ExecutionPolicy Bypass -File .\interrupt-affinity-utility.ps1`
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and its Policy / Cores columns in the grid
+      description: The device the report is about, with the Policy and Cores values the grid showed for it.
+      placeholder: Realtek Gaming 2.5GbE Family Controller - SpecifiedProcessors, cores 10
+  - type: dropdown
+    id: launch-method
+    attributes:
+      label: How did you run it?
+      description: Each method reaches the script through a different relaunch path, and that is where launch bugs live.
+      options:
+        - PowerShell Gallery (Install-Script)
+        - irm | iex one-liner
+        - Run.bat from the ZIP
+        - .ps1 directly (clone or download)
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display language
+      description: Win+R, `winver`. The display language matters - device names in the grid and the output are localized.
+      placeholder: Windows 11 24H2, build 26100.4061, German
+    validations:
+      required: true

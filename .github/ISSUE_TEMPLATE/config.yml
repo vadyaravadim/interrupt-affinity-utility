@@ -1,0 +1,9 @@
+# Blank issues stay on: ideas and questions should not have to fit the bug form.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/vadyaravadim/interrupt-affinity-utility/security/advisories/new
+    about: The script runs as Administrator - please report privately, not in a public issue.
+  - name: Pinned cores change nothing, NVMe drives are missing, or FPS did not change?
+    url: https://github.com/vadyaravadim/interrupt-affinity-utility#faq
+    about: Expected - the FAQ explains the device restart, how RSS steers NIC DPCs, why NVMe is hidden, and what pinning does and does not improve.
