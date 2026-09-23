@@ -9,6 +9,8 @@ verbatim into the release and fails the release if the tag has no section here.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-09-23
+
 ### Added
 
 - The banner shows the script version (`INTERRUPT AFFINITY UTILITY v1.0.3`), so you can tell at a glance
@@ -94,7 +96,8 @@ verbatim into the release and fails the release if the tag has no section here.
   undo, apply the original undo, then reset - including a real `reg.exe import` round-trip of every value
   type.
 
-[Unreleased]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/vadyaravadim/interrupt-affinity-utility/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/vadyaravadim/interrupt-affinity-utility/releases/tag/v1.0.0
