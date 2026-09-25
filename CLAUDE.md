@@ -71,3 +71,10 @@ hand-edited value that disagrees with the tag would only mislead whoever reads t
 **The placeholder is `0.0.0` and must stay exactly that**: the banner reads its own `.VERSION` line and
 prints `dev build` for `0.0.0`, the stamped tag otherwise. It used to be `1.0.0`, which is also a real tag,
 so a clone of `main` was indistinguishable from the v1.0.0 release.
+
+## The RigPolice pages that mirror this script
+
+- **The hub card.** `src/lib/latency-toolbox.ts` in the rigpolice repo holds this script's card on
+  https://rigpolice.com/system/latency-toolbox/: what it does, what was measured with it, and whether it
+  writes an undo file. A release that changes any of those updates the card in the same pass; nothing
+  there reads this repo, so the card drifts silently otherwise.
