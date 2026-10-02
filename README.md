@@ -13,9 +13,11 @@ Zero install. Zero dependencies. Built-in undo.
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)](https://docs.microsoft.com/en-us/powershell/)
 [![Latest release](https://img.shields.io/github/v/release/vadyaravadim/interrupt-affinity-utility)](https://github.com/vadyaravadim/interrupt-affinity-utility/releases)
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/interrupt-affinity-utility?logo=powershell&label=PS%20Gallery)](https://www.powershellgallery.com/packages/interrupt-affinity-utility)
-![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/interrupt-affinity-utility?style=social)
+[![GitHub Stars](https://img.shields.io/github/stars/vadyaravadim/interrupt-affinity-utility?style=social)](https://github.com/vadyaravadim/interrupt-affinity-utility/stargazers)
 
 **Part of the [RigPolice Latency Toolbox](https://rigpolice.com/system/latency-toolbox/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility) — check your mouse's real polling rate after the change with the free [Polling Rate Test](https://rigpolice.com/mouse/tests/polling-rate-test/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility)**
+
+If it fixes your stutters, a ⭐ helps others find it.
 
 </div>
 
