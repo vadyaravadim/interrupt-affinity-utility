@@ -487,4 +487,8 @@ if ($failed) {
     Write-Host "$failed device(s) failed - see errors above." -ForegroundColor Yellow
 }
 Write-Host "Restart the device (disable/enable in Device Manager) or REBOOT for changes to take effect." -ForegroundColor Green
+if ($updated -and -not $Reset) {
+    Write-Host ""
+    Write-Host "Useful? A star on GitHub helps others find it: https://github.com/vadyaravadim/interrupt-affinity-utility"
+}
 Wait-IfElevatedWindow

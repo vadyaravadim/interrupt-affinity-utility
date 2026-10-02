@@ -9,6 +9,12 @@ verbatim into the release and fails the release if the tag has no section here.
 
 ## [Unreleased]
 
+### Changed
+
+- A successful run now ends with one line linking to this repo and asking for a star, so people who got
+  the one-liner from an article or a chatbot know where the tool lives. It is printed only when a device
+  was pinned: not with `-Reset`.
+
 ## [1.0.3] - 2026-09-23
 
 ### Added
