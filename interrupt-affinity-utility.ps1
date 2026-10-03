@@ -65,8 +65,6 @@ param(
     [switch]$Elevated   # internal: set by the self-elevation relaunch
 )
 
-$ErrorActionPreference = 'Stop'
-
 # Keep the self-elevated window open so the user can read the output.
 function Wait-IfElevatedWindow {
     if ($Elevated) { Read-Host "Press Enter to close" | Out-Null }
@@ -102,14 +100,14 @@ if (-not $PSCommandPath) {
     # holds the caller's command line, not the script body) - download the
     # script.
     try {
-        $body = Invoke-RestMethod 'https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1' -TimeoutSec 30
+        $body = Invoke-RestMethod 'https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1' -TimeoutSec 30 -ErrorAction Stop
     } catch {
         Write-Host "ERROR: could not download the script ($($_.Exception.Message)). Check your internet connection, or save the script to a file and run it from there." -ForegroundColor Red
         return
     }
     $saved = Join-Path $env:USERPROFILE 'interrupt-affinity-utility.ps1'
     if ((Test-Path $saved) -and ([IO.File]::ReadAllText($saved) -cne $body)) {
-        Copy-Item $saved "$saved.bak" -Force
+        Copy-Item $saved "$saved.bak" -Force -ErrorAction Stop
         Write-Host "Existing $saved differs - previous copy kept as $saved.bak" -ForegroundColor Yellow
     }
     # UTF8Encoding($false) = no BOM: a BOM would break a later `irm | iex` of
@@ -123,6 +121,10 @@ if (-not $PSCommandPath) {
     # The rerun's exit code stays in $LASTEXITCODE for scripted callers.
     return
 }
+
+# Only now: under `irm | iex` the block above runs in the caller's own session,
+# where Stop would stay behind in their console after the script is done.
+$ErrorActionPreference = 'Stop'
 
 # ---- Everything below -Status writes the registry: Administrator required ----
 $principal = New-Object Security.Principal.WindowsPrincipal(
@@ -144,7 +146,7 @@ if (-not $Status -and -not $principal.IsInRole([Security.Principal.WindowsBuiltI
 # Read from this file's own PSScriptInfo block - the one place the version
 # lives (release.yml stamps the tag into it). 0.0.0 is the committed
 # placeholder: a clone or ZIP of main, not a release.
-$version = [regex]::Match((Get-Content $PSCommandPath -Raw), '(?m)^\.VERSION\s+(\S+)').Groups[1].Value
+$version = [regex]::Match((Get-Content -LiteralPath $PSCommandPath -Raw), '(?m)^\.VERSION\s+(\S+)').Groups[1].Value
 $version = if ($version -eq '0.0.0') { 'dev build' } else { "v$version" }
 
 Write-Host ""
@@ -242,8 +244,8 @@ public static class CpuSets {
 # "0-3,16,18" from a KAFFINITY mask, for the Cores column.
 function ConvertTo-CoreList {
     param([uint64]$Mask)
-    $set = 0..63 | Where-Object { ($Mask -shr $_) -band 1 }
-    if (-not $set) { return '-' }
+    $set = @(0..63 | Where-Object { ($Mask -shr $_) -band 1 })
+    if (-not $set.Count) { return '-' }   # Count: a lone CPU 0 is falsy
     $ranges = New-Object System.Collections.Generic.List[string]
     $start = $prev = $set[0]
     foreach ($i in ($set | Select-Object -Skip 1)) {
@@ -434,12 +436,12 @@ if (-not $selected) {
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $undoFile = Join-Path $PSScriptRoot "affinity_undo_$stamp.reg"
 $n = 1
-while (Test-Path $undoFile) { $undoFile = Join-Path $PSScriptRoot ("affinity_undo_{0}_{1}.reg" -f $stamp, $n++) }
+while (Test-Path -LiteralPath $undoFile) { $undoFile = Join-Path $PSScriptRoot ("affinity_undo_{0}_{1}.reg" -f $stamp, $n++) }
 $origFile = Join-Path $PSScriptRoot 'affinity_undo_original.reg'
-if (-not (Test-Path $origFile)) {
-    Set-Content -Path $origFile -Value "Windows Registry Editor Version 5.00`r`n" -Encoding Unicode
+if (-not (Test-Path -LiteralPath $origFile)) {
+    Set-Content -LiteralPath $origFile -Value "Windows Registry Editor Version 5.00`r`n" -Encoding Unicode
 }
-$origText = Get-Content $origFile -Raw
+$origText = Get-Content -LiteralPath $origFile -Raw
 $undo = New-Object System.Text.StringBuilder
 [void]$undo.AppendLine('Windows Registry Editor Version 5.00')
 [void]$undo.AppendLine('')
@@ -454,8 +456,8 @@ foreach ($d in $selected) {
     [void]$undo.AppendLine($stanza)
     if (-not $origText.Contains("[$raw]")) { [void]$origAdd.AppendLine($stanza) }
 }
-Set-Content -Path $undoFile -Value $undo.ToString() -Encoding Unicode
-if ($origAdd.Length) { Add-Content -Path $origFile -Value $origAdd.ToString() -Encoding Unicode }
+Set-Content -LiteralPath $undoFile -Value $undo.ToString() -Encoding Unicode
+if ($origAdd.Length) { Add-Content -LiteralPath $origFile -Value $origAdd.ToString() -Encoding Unicode }
 Write-Host "Undo files: $undoFile (reverts this run); $origFile (restores the pre-tool state)" -ForegroundColor Cyan
 
 $updated = 0

@@ -29,7 +29,15 @@ If it fixes your stutters, a ⭐ helps others find it.
 
 ## Quick Start
 
-**Easiest — from the PowerShell Gallery:**
+**Easiest — one line, in any PowerShell** (it self-elevates):
+
+```powershell
+irm https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1 | iex
+```
+
+The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`. The `irm | iex` pipe itself takes no switches - run the saved copy instead, see [Optional switches](#optional-switches).
+
+**From the PowerShell Gallery**, in PowerShell 7 (`pwsh`):
 
 ```powershell
 Install-Script interrupt-affinity-utility
@@ -37,15 +45,7 @@ interrupt-affinity-utility           # then run it by name (open a NEW PowerShel
 interrupt-affinity-utility -ShowAll  # switches work directly: -ShowAll, -Reset, -Status
 ```
 
-The script self-elevates. Update later with `Update-Script interrupt-affinity-utility`.
-
-**One-liner** instead (in any PowerShell — it self-elevates):
-
-```powershell
-irm https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/download/interrupt-affinity-utility.ps1 | iex
-```
-
-The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`. The `irm | iex` pipe itself takes no switches - run the saved copy instead, see [Optional switches](#optional-switches).
+The script self-elevates. Update later with `Update-Script interrupt-affinity-utility`. Not in the Windows PowerShell 5.1 that comes with Windows: there `Install-Script` wants an admin console and the default execution policy blocks the installed script — use the one-liner instead.
 
 **Or clone:**
 
@@ -78,7 +78,7 @@ How to pass a switch depends on how you got the script:
 
 | Installed via | Command |
 |---------------|---------|
-| PowerShell Gallery | `interrupt-affinity-utility -ShowAll` |
+| PowerShell Gallery (PowerShell 7) | `interrupt-affinity-utility -ShowAll` |
 | ZIP or clone | `.\Run.bat -ShowAll` from the script's folder |
 | One-liner | `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\interrupt-affinity-utility.ps1" -ShowAll` |
 
