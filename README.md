@@ -34,7 +34,7 @@ If it fixes your stutters, a ⭐ helps others find it.
 ```powershell
 Install-Script interrupt-affinity-utility
 interrupt-affinity-utility           # then run it by name (open a NEW PowerShell window first, so the Scripts folder is on PATH)
-interrupt-affinity-utility -ShowAll  # switches work directly: -ShowAll, -Reset
+interrupt-affinity-utility -ShowAll  # switches work directly: -ShowAll, -Reset, -Status
 ```
 
 The script self-elevates. Update later with `Update-Script interrupt-affinity-utility`.
@@ -72,6 +72,7 @@ However you launch it:
 | --- | --- |
 | `-ShowAll` | Show every PCI device with interrupt settings, including bridges/controllers hidden by default |
 | `-Reset` | Remove the affinity override from the selected devices (restore the machine default) |
+| `-Status` | Print every device with its current policy and cores. Changes nothing, needs no admin rights |
 
 How to pass a switch depends on how you got the script:
 
@@ -110,7 +111,7 @@ It is also the standard server-side technique for network scaling — Microsoft 
 |---|---|
 | **Windows** | 10, 11 (64-bit, up to 64 logical processors) |
 | **PowerShell** | Windows PowerShell 5.1 (ships with Windows 10/11); PowerShell 7 works too. Uses `Out-GridView`, which both have on Windows editions with a desktop and which is **not** available on Server Core. The script detects a missing `Out-GridView` and tells you what to do |
-| **Rights** | Administrator (the script self-elevates via UAC) |
+| **Rights** | Administrator (the script self-elevates via UAC); `-Status` needs none |
 
 ## How It Works
 
@@ -153,7 +154,7 @@ After restarting the device, put it under load (for a NIC: download something; f
 
   The `Name` column is `<cpu>, <adapter>` — the CPU number switches to the core you pinned.
 - **perfmon** → **Per Processor Network Interface Card Activity ▸ Interrupts/sec** shows the same thing graphically; for non-NIC devices use a trace (`xperf -a dpcisr`) or LatencyMon's per-CPU view.
-- Or run the script again — the grid shows the current policy and core list of every device.
+- Or run the script with `-Status` (no admin rights needed) — it prints the current policy and core list of every device. That shows the setting is in place, not where the interrupts land; the checks above show that.
 
 This exact check is how the utility was validated on a Realtek 2.5GbE NIC (i9-14900F): with the default policy its ISR ran on CPU 1; pinned to CPU 10 it moved to CPU 10 (~6600 interrupts/sec under a saturated download), pinned to CPU 20 it moved to CPU 20, and applying the undo files put it back on CPU 1. The receive DPCs kept landing on the RSS-owned CPUs throughout — see the [RSS FAQ](#why-dont-my-cores-change-anything-for-my-nic).
 

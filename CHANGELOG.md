@@ -9,11 +9,25 @@ verbatim into the release and fails the release if the tag has no section here.
 
 ## [Unreleased]
 
+### Added
+
+- `-Status` prints every device with its current policy and cores and changes nothing. It needs no admin
+  rights, so checking whether a pin survived a driver or Windows update no longer costs a UAC prompt and a
+  grid you have to cancel.
+
 ### Changed
 
 - A successful run now ends with one line linking to this repo and asking for a star, so people who got
   the one-liner from an article or a chatbot know where the tool lives. It is printed only when a device
   was pinned: not with `-Reset`.
+
+### Fixed
+
+- Selecting a device that was already pinned to the chosen cores - or, with `-Reset`, one that had no
+  override - wrote another undo file and reported the device as updated (`[RESET]` for a device that had
+  nothing to reset). Such devices are now skipped, and a run that changes nothing writes no undo file.
+- Hardware that was removed from the PC (an old graphics card after an upgrade) still showed up in the
+  list, and pinning it reported success while changing nothing. Only connected devices are listed now.
 
 ## [1.0.3] - 2026-09-23
 

@@ -45,6 +45,9 @@
 .PARAMETER Reset
     Remove the affinity policy override from the selected devices
     (restore the machine default) instead of setting one.
+.PARAMETER Status
+    Print the device list with the current policy and cores, change nothing.
+    Does not need Administrator rights.
 .NOTES
     Restart the device (disable/enable in Device Manager) or reboot for
     changes to take effect.
@@ -58,6 +61,7 @@
 param(
     [switch]$ShowAll,
     [switch]$Reset,
+    [switch]$Status,
     [switch]$Elevated   # internal: set by the self-elevation relaunch
 )
 
@@ -85,6 +89,7 @@ function Get-ForwardedSwitchList {
     $a = @()
     if ($ShowAll) { $a += '-ShowAll' }
     if ($Reset)   { $a += '-Reset' }
+    if ($Status)  { $a += '-Status' }
     $a
 }
 
@@ -119,9 +124,10 @@ if (-not $PSCommandPath) {
     return
 }
 
+# ---- Everything below -Status writes the registry: Administrator required ----
 $principal = New-Object Security.Principal.WindowsPrincipal(
     [Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+if (-not $Status -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Not running as Administrator. Requesting elevation..." -ForegroundColor Yellow
     try {
         $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass',
@@ -149,7 +155,8 @@ Write-Host ""
 
 # Out-GridView exists only on Windows editions with a desktop - Server Core has
 # none; fail up front with instructions instead of a raw CommandNotFound mid-run.
-if (-not (Get-Command Out-GridView -ErrorAction SilentlyContinue)) {
+# -Status prints to the console and does not need it.
+if (-not $Status -and -not (Get-Command Out-GridView -ErrorAction SilentlyContinue)) {
     Write-Host "Out-GridView is not available in this PowerShell. It needs a Windows edition with a desktop (not Server Core); on a desktop edition, run the script with Windows PowerShell (powershell.exe)." -ForegroundColor Red
     Wait-IfElevatedWindow
     return
@@ -177,20 +184,6 @@ $PolicyNames = @{
     4 = 'SpecifiedProcessors'
     5 = 'SpreadMessages'
     6 = 'Steered (system)'
-}
-
-function Get-DeviceName {
-    param([Microsoft.Win32.RegistryKey]$Key)
-    $fn = $Key.GetValue('FriendlyName')
-    if ([string]::IsNullOrWhiteSpace($fn)) { $fn = $Key.GetValue('DeviceDesc') }
-    if ($fn -and $fn -match '^@') {
-        # Indirect string "@file,resid;Text": the text is everything after the
-        # FIRST ';' and may itself contain ';'. Keep the raw string if nothing
-        # follows ';' (a malformed indirect string) so the device stays visible.
-        $text = ($fn -split ';', 2)[1]
-        if (-not [string]::IsNullOrWhiteSpace($text)) { $fn = $text }
-    }
-    return $fn
 }
 
 # Logical processors with their efficiency class (P/E on hybrid CPUs) and
@@ -309,53 +302,49 @@ function Get-UndoLine {
 }
 
 Write-Host "Scanning PCI devices..." -ForegroundColor Cyan
-$pciRoot = 'HKLM:\SYSTEM\CurrentControlSet\Enum\PCI'
 $rows = New-Object System.Collections.Generic.List[object]
 
 $hidden = 0
-foreach ($devClass in Get-ChildItem $pciRoot -ErrorAction SilentlyContinue) {
-    foreach ($inst in Get-ChildItem $devClass.PSPath -ErrorAction SilentlyContinue) {
-        $name = Get-DeviceName -Key $inst
-        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+# Present devices only: Enum\PCI also keeps the keys of removed hardware (an
+# old GPU), and pinning those changes nothing. Windows resolves the names.
+foreach ($dev in Get-PnpDevice -PresentOnly) {
+    if ($dev.InstanceId -notlike 'PCI\*' -or -not $dev.FriendlyName) { continue }
 
-        # Interrupt-capable devices expose "Device Parameters\Interrupt Management".
-        $imPath = Join-Path $inst.PSPath 'Device Parameters\Interrupt Management'
-        if (-not (Test-Path $imPath)) { continue }
+    # Interrupt-capable devices expose "Device Parameters\Interrupt Management".
+    $imPath = "Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\$($dev.InstanceId)\Device Parameters\Interrupt Management"
+    if (-not (Test-Path $imPath)) { continue }
 
-        if (-not $ShowAll) {
-            $classGuid = $inst.GetValue('ClassGUID')
-            if ($classGuid -notin $IncludeClassGuids -and
-                $inst.GetValue('Service') -notin $AudioBusServices) { $hidden++; continue }
-        }
-
-        # Absent key/values = no override: the OS picks the processors.
-        $apPath = Join-Path $imPath 'Affinity Policy'
-        $policy = 'Default'; $cores = '-'
-        if (Test-Path $apPath) {
-            $apKey = Get-Item $apPath
-            $dp = $apKey.GetValue('DevicePolicy')
-            if ($null -ne $dp) {
-                # -as: a foreign value (REG_SZ, out-of-range QWORD) must show as
-                # Unknown, not abort the whole scan via the trap.
-                $dpInt = $dp -as [int]
-                $policy = if ($null -ne $dpInt -and $PolicyNames[$dpInt]) { $PolicyNames[$dpInt] }
-                          else { "Unknown ($dp)" }
-            }
-            $aso = $apKey.GetValue('AssignmentSetOverride')
-            if ($null -ne $aso) {
-                $m = ConvertTo-Mask $aso
-                $cores = if ($null -ne $m) { ConvertTo-CoreList -Mask $m } else { "Unreadable ($aso)" }
-            }
-        }
-
-        $rows.Add([PSCustomObject]@{
-            Name     = $name
-            Policy   = $policy
-            Cores    = $cores
-            DeviceID = $inst.PSChildName
-            RegPath  = $apPath   # target key we will write
-        })
+    if (-not $ShowAll -and $dev.ClassGuid -notin $IncludeClassGuids -and $dev.Service -notin $AudioBusServices) {
+        $hidden++; continue
     }
+
+    # Absent key/values = no override: the OS picks the processors.
+    $apPath = "$imPath\Affinity Policy"
+    $policy = 'Default'; $cores = '-'
+    if (Test-Path $apPath) {
+        $apKey = Get-Item $apPath
+        $dp = $apKey.GetValue('DevicePolicy')
+        if ($null -ne $dp) {
+            # -as: a foreign value (REG_SZ, out-of-range QWORD) must show as
+            # Unknown, not abort the whole scan via the trap.
+            $dpInt = $dp -as [int]
+            $policy = if ($null -ne $dpInt -and $PolicyNames[$dpInt]) { $PolicyNames[$dpInt] }
+                      else { "Unknown ($dp)" }
+        }
+        $aso = $apKey.GetValue('AssignmentSetOverride')
+        if ($null -ne $aso) {
+            $m = ConvertTo-Mask $aso
+            $cores = if ($null -ne $m) { ConvertTo-CoreList -Mask $m } else { "Unreadable ($aso)" }
+        }
+    }
+
+    $rows.Add([PSCustomObject]@{
+        Name     = $dev.FriendlyName
+        Policy   = $policy
+        Cores    = $cores
+        DeviceID = $dev.InstanceId
+        RegPath  = $apPath   # target key we will write
+    })
 }
 
 if ($rows.Count -eq 0) {
@@ -367,10 +356,15 @@ if ($hidden) {
     Write-Host "$hidden more device(s) (storage controllers, bridges, ...) are hidden by the default filter. Use -ShowAll to include them." -ForegroundColor DarkGray
 }
 
+$rows = $rows | Sort-Object Policy, Name
+if ($Status) {
+    $rows | Format-Table Name, Policy, Cores -AutoSize -Wrap | Out-Host
+    Wait-IfElevatedWindow; return
+}
+
 if ($Reset) { $title = 'Select devices to RESET interrupt affinity to machine default' }
 else        { $title = 'Select devices whose interrupts to pin' }
 $selected = $rows |
-    Sort-Object Policy, Name |
     Out-GridView -Title "$title (Ctrl-click for multiple)" -PassThru
 
 if (-not $selected) {
@@ -380,6 +374,7 @@ if (-not $selected) {
 }
 
 $mask = [uint64]0
+$targetCores = '-'
 if (-not $Reset) {
     $cpus = Get-CpuTopology
     $extra = @($cpus | Where-Object { $_.Group -ne 0 -or $_.CPU -gt 63 })
@@ -411,7 +406,19 @@ if (-not $Reset) {
         return
     }
     foreach ($c in $picked) { $mask = $mask -bor ([uint64]1 -shl $c.CPU) }
-    Write-Host ("Target cores: {0} (mask 0x{1:X})" -f (ConvertTo-CoreList -Mask $mask), $mask) -ForegroundColor Cyan
+    $targetCores = ConvertTo-CoreList -Mask $mask
+    Write-Host ("Target cores: {0} (mask 0x{1:X})" -f $targetCores, $mask) -ForegroundColor Cyan
+}
+
+# A device already in the target state would still get an undo stanza whose
+# "previous" state is the tweak itself, and be reported as updated.
+$targetPolicy = if ($Reset) { 'Default' } else { $PolicyNames[4] }
+$selected = @($selected | Where-Object { $_.Policy -ne $targetPolicy -or $_.Cores -ne $targetCores })
+if (-not $selected) {
+    $already = if ($Reset) { 'at the machine default' } else { "pinned to $targetCores" }
+    Write-Host "Every selected device is already $already - nothing to change, no undo file written." -ForegroundColor Green
+    Wait-IfElevatedWindow
+    return
 }
 
 # Lightweight rollback: record the CURRENT state of every selected key into a
@@ -471,7 +478,7 @@ foreach ($d in $selected) {
                 -Value 4 -PropertyType DWord -Force | Out-Null
             New-ItemProperty -Path $d.RegPath -Name 'AssignmentSetOverride' `
                 -Value ([BitConverter]::GetBytes($mask)) -PropertyType Binary -Force | Out-Null
-            Write-Host ("  [PIN {0}] {1}" -f (ConvertTo-CoreList -Mask $mask), $d.Name) -ForegroundColor Green
+            Write-Host ("  [PIN {0}] {1}" -f $targetCores, $d.Name) -ForegroundColor Green
         }
         $updated++
     } catch {

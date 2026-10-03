@@ -8,9 +8,16 @@ this layout: one `.ps1`, `Run.bat`, `PSScriptAnalyzerSettings.psd1`, and the sam
 **`Out-GridView` is a hard dependency and the check for it stays up front.** It exists only on Windows
 editions with a desktop - Server Core has none, while PowerShell 7 on a desktop edition does have it; failing
 early with instructions beats a raw `CommandNotFound` thrown halfway through a scan the user already
-waited on.
+waited on. `-Status` prints to the console, so it skips that check and the elevation.
+
+**Only present devices are listed** (`Get-PnpDevice -PresentOnly`). `Enum\PCI` keeps the keys of removed
+hardware, and pinning those reports success while changing nothing.
 
 ## Invariants the undo files depend on
+
+- **A run that changes nothing writes NO undo file.** Devices already in the target state (same policy and
+  cores, or no override under `-Reset`) are dropped from the selection first; a snapshot of an
+  already-pinned device would make the newest per-run file "revert" to the pin.
 
 - **Two undo files, and they are not redundant.** `affinity_undo_<stamp>.reg` reverts one run;
   `affinity_undo_original.reg` is cumulative and records a device's state the FIRST time this tool touches
@@ -25,7 +32,7 @@ waited on.
   the tool may freely take over.
 - **`Get-ForwardedSwitchList` is the ONE place mode switches are listed.** Both relaunch paths - the
   `irm | iex` bootstrap rerun and the UAC elevation - build their argument list from it, so neither can
-  silently drop `-ShowAll` or `-Reset`. Splat it as `@(...)`: on PS 5.1 a single forwarded switch unrolls
+  silently drop `-ShowAll`, `-Reset` or `-Status`. Splat it as `@(...)`: on PS 5.1 a single forwarded switch unrolls
   to a scalar string and breaks `powershell.exe -File` switch binding.
 - **A piped run saves the script into the user profile, not `%TEMP%`.** The undo files are written next to
   the script, so they have to sit somewhere that survives automatic temp cleanup.
