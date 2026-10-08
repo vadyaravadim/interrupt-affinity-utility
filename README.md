@@ -2,7 +2,7 @@
 
 # Interrupt Affinity Utility
 
-**Pin device interrupts to specific CPU cores. Tame DPC latency. P/E-core aware.**
+**Pin device interrupts to the CPU cores you pick. P/E-core aware.**
 
 An open-source PowerShell script to view and set the **interrupt affinity policy** of PCI devices on Windows 10/11 — a transparent alternative to GoInterruptPolicy and the retired Microsoft Interrupt-Affinity Policy Tool.
 Zero install. Zero dependencies. Built-in undo.
@@ -17,7 +17,7 @@ Zero install. Zero dependencies. Built-in undo.
 
 **Part of the [RigPolice Latency Toolbox](https://rigpolice.com/system/latency-toolbox/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility) — check your mouse's real polling rate after the change with the free [Polling Rate Test](https://rigpolice.com/mouse/tests/polling-rate-test/?utm_source=github&utm_medium=readme&utm_campaign=interrupt-affinity-utility)**
 
-If it fixes your stutters, a ⭐ helps others find it.
+If it works for you, a ⭐ helps others find it.
 
 </div>
 
@@ -97,11 +97,13 @@ Rollback = double-click the undo file, then restart the device or reboot. No Sys
 
 Every time your GPU finishes a frame or your NIC receives a packet, it raises an interrupt, and some CPU core stops what it's doing to service it (the ISR), then runs the follow-up work (the DPC). By default Windows decides which cores that happens on — and its choice can collide with whatever those cores are already busy with. On hybrid CPUs the interrupts of a latency-critical device can even land on slower E-cores.
 
-An **affinity policy** tells Windows which cores are allowed to service a given device's interrupts. Pinning a latency-critical device (GPU, NIC, audio, USB) to one or two dedicated P-cores — away from CPU 0, where much of the system's own interrupt traffic lands — is a classic tweak for:
+An **affinity policy** tells Windows which cores are allowed to service a given device's interrupts. Guides recommend pinning a latency-critical device (GPU, NIC, audio, USB) to one or two dedicated P-cores, away from CPU 0, for:
 
 - DPC latency spikes and frame-time stutters despite high FPS
 - Audio popping / crackling under load
 - Inconsistent input response in competitive games
+
+We confirmed the pin holds (see [Verify](#verify-watch-the-interrupts-move)). Whether it fixes any of the above we have not measured yet, so measure your own system before and after.
 
 It is also the standard server-side technique for network scaling — Microsoft shipped a dedicated tool for exactly this in the Windows Server era (see [FAQ](#how-is-this-different-from-the-microsoft-interrupt-affinity-policy-tool-intpolicy)).
 
@@ -176,7 +178,7 @@ The set of CPU cores allowed to service a device's interrupts — both the inter
 
 ### Does pinning interrupts reduce input lag or increase FPS?
 
-It targets **consistency**, not average FPS: keeping a latency-critical device's interrupts on dedicated, lightly-loaded P-cores reduces the chance that an ISR/DPC gets delayed behind other work — which is what shows up as frame-time spikes, audio crackle, or inconsistent input response. On a healthy system with no DPC latency problem you may see no difference at all. Measure before and after (e.g. with LatencyMon or perfmon) instead of stacking tweaks blindly.
+We have not measured either. What we checked is that the pin holds: a Realtek 2.5GbE card serviced its interrupts on whichever core we chose (see [Verify](#verify-watch-the-interrupts-move)). The idea behind the tweak is that a device's ISR and DPCs wait less on a lightly loaded P-core than on a busy one. Whether that changes anything in your games, measure before and after (e.g. with LatencyMon or perfmon) instead of stacking tweaks blindly.
 
 ### Which cores should I pick on a hybrid CPU (P-cores vs E-cores)?
 
@@ -212,10 +214,10 @@ Hidden by the default filter on purpose: NVMe already spreads MSI-X interrupts a
 
 ## Related
 
-- [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility) — enable MSI mode (Message Signaled Interrupts) for GPU, USB, network & audio devices to cut DPC latency and input lag
-- [CPU Parking Disabler](https://github.com/vadyaravadim/cpu-parking-disabler) — disable CPU core parking on Windows 10/11 to fix micro-stutters and input lag
+- [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility) — enable MSI mode (Message Signaled Interrupts) for GPU, USB, network & audio devices
+- [CPU Parking Disabler](https://github.com/vadyaravadim/cpu-parking-disabler) — disable CPU core parking on Windows 10/11, with the parked-core count shown before and after
 - [Timer Resolution Utility](https://github.com/vadyaravadim/timer-resolution-utility) — set 0.5 ms timer resolution, disable dynamic tick, un-force HPET — with a built-in Sleep(1) benchmark
-- [GameDVR & FSO Disabler](https://github.com/vadyaravadim/gamedvr-fso-disabler) — disable Game DVR / Xbox Game Bar capture and Fullscreen Optimizations on Windows 10/11 to fix capture stutters and frame drops
+- [GameDVR & FSO Disabler](https://github.com/vadyaravadim/gamedvr-fso-disabler) — disable Game DVR / Xbox Game Bar capture and Fullscreen Optimizations on Windows 10/11
 - [Remove Hidden Devices](https://github.com/vadyaravadim/remove-hidden-devices) — remove ghost / hidden devices left behind by unplugged USB sticks, headsets & dongles cluttering Device Manager
 
 Same idea across the series: one transparent PowerShell script, no binaries, you see exactly what changes.
@@ -232,7 +234,7 @@ Editing interrupt settings can, in rare cases, cause a device to fail to start. 
 
 <div align="center">
 
-If this fixed your stutters, consider giving it a ⭐
+If this helped, consider giving it a ⭐
 
 [Report Issues](https://github.com/vadyaravadim/interrupt-affinity-utility/issues)
 
