@@ -17,7 +17,7 @@ section is empty or its compare link at the bottom is missing.
 - Before a release is published, the script is now checked against the syntax and .NET types of Windows
   PowerShell 5.1, the version `Run.bat` and the elevated relaunch run it under.
 - Checking that a downloaded script was built from this repository takes a new `gh attestation verify` command
-  from the next release on: releases are now built by the release workflow all six RigPolice scripts share.
+  from this release on: releases are now built by the release workflow all six RigPolice scripts share.
   SECURITY.md has both commands.
 
 ## [1.1.0] - 2026-10-03
