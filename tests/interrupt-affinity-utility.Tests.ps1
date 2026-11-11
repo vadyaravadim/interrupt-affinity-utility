@@ -173,18 +173,32 @@ Describe 'whole-script runs with every device, registry and grid command mocked'
         Should -Invoke Get-PnpDevice -Times 0 -Exactly
     }
 
-    It 'does not tell the user to restart when every registry write failed' -Skip:(-not $isAdmin) {
-        Mock Get-PnpDevice { [pscustomobject]@{ InstanceId = 'PCI\VEN_FAKE&DEV_FAKE\0'; FriendlyName = 'Fake NIC'; ClassGuid = '{4d36e972-e325-11ce-bfc1-08002be10318}'; Service = 'fakenic' } }
-        Mock Test-Path { $true } -ParameterFilter { "$Path$LiteralPath" -like '*\Interrupt Management' }
-        Mock Out-GridView { [pscustomobject]@{ Name = 'Fake NIC'; Policy = 'Default'; Cores = '-'; DeviceID = 'PCI\VEN_FAKE&DEV_FAKE\0'; RegPath = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\PCI\VEN_FAKE&DEV_FAKE\0\Device Parameters\Interrupt Management\Affinity Policy' } } -ParameterFilter { $Title -like 'Select devices*' }
-        Mock Out-GridView { [pscustomobject]@{ CPU = 0; Type = 'Core' } } -ParameterFilter { $Title -like 'Select CPU core*' }
-        Mock New-Item { throw 'registry write denied' }
-        $output = & $copy
-        ($output | Where-Object { "$_" -like 'ERROR:*' }) -join "`n" | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
-        Should -Invoke New-Item -Times 1 -Exactly
-        Should -Invoke New-ItemProperty -Times 0 -Exactly
-        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Done. 0 of 1*' }
-        Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter { "$Object" -like 'Restart the device*' }
+    Context 'one fake NIC picked and pinned to CPU 0' {
+        BeforeEach {
+            Mock Get-PnpDevice { [pscustomobject]@{ InstanceId = 'PCI\VEN_FAKE&DEV_FAKE\0'; FriendlyName = 'Fake NIC'; ClassGuid = '{4d36e972-e325-11ce-bfc1-08002be10318}'; Service = 'fakenic' } }
+            Mock Test-Path { $true } -ParameterFilter { "$Path$LiteralPath" -like '*\Interrupt Management' }
+            Mock Out-GridView { [pscustomobject]@{ Name = 'Fake NIC'; Policy = 'Default'; Cores = '-'; DeviceID = 'PCI\VEN_FAKE&DEV_FAKE\0'; RegPath = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\PCI\VEN_FAKE&DEV_FAKE\0\Device Parameters\Interrupt Management\Affinity Policy' } } -ParameterFilter { $Title -like 'Select devices*' }
+            Mock Out-GridView { [pscustomobject]@{ CPU = 0; Type = 'Core' } } -ParameterFilter { $Title -like 'Select CPU core*' }
+        }
+
+        It 'does not tell the user to restart when every registry write failed' -Skip:(-not $isAdmin) {
+            Mock New-Item { throw 'registry write denied' }
+            $output = & $copy
+            ($output | Where-Object { "$_" -like 'ERROR:*' }) -join "`n" | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
+            Should -Invoke New-Item -Times 1 -Exactly
+            Should -Invoke New-ItemProperty -Times 0 -Exactly
+            Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Done. 0 of 1*' }
+            Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter { "$Object" -like 'Restart the device*' }
+        }
+
+        It 'tells the user to restart when DevicePolicy went in before the mask write failed' -Skip:(-not $isAdmin) {
+            Mock New-ItemProperty { throw 'registry write denied' } -ParameterFilter { $Name -eq 'AssignmentSetOverride' }
+            $output = & $copy
+            ($output | Where-Object { "$_" -like 'ERROR:*' }) -join "`n" | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
+            Should -Invoke New-ItemProperty -Times 1 -Exactly -ParameterFilter { $Name -eq 'DevicePolicy' }
+            Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Done. 0 of 1*' }
+            Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Restart the device*' } -Because 'the device already has its DevicePolicy changed'
+        }
     }
 }
 
