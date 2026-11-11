@@ -1,5 +1,7 @@
 # Interrupt Affinity Utility
 
+Maintainer notes for Claude Code and the maintainer. Contributors start with [CONTRIBUTING.md](https://github.com/vadyaravadim/.github/blob/main/CONTRIBUTING.md); `rigpolice`, named below, is the maintainer's private website repository.
+
 A single self-contained PowerShell script (`interrupt-affinity-utility.ps1`) that pins PCI device
 interrupts to chosen CPU cores through the documented `DevicePolicy` / `AssignmentSetOverride` values,
 driven by two `Out-GridView` pickers. Part of a family of six single-script Windows tuning tools that share

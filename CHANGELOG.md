@@ -10,6 +10,13 @@ section is empty or its compare link at the bottom is missing.
 
 ## [Unreleased]
 
+### Added
+
+- The README's Quick Start says how to check a downloaded script before running it, and SECURITY.md now
+  starts with `gh release verify-asset`, which works for every immutable release whichever workflow built it.
+- The README FAQ says how to remove the script and the files it leaves behind.
+- `Get-Help .\interrupt-affinity-utility.ps1 -Examples` shows how to run the script and each of its switches.
+
 ### Fixed
 
 - On Windows Server Core the run stopped with a raw error after the device scan instead of saying the
@@ -20,6 +27,9 @@ section is empty or its compare link at the bottom is missing.
 
 ### Changed
 
+- On the PowerShell Gallery the script page links this changelog as its release notes, shows the license's
+  copyright line, and lists the script for both Windows PowerShell and PowerShell 7.
+- The FAQ attributes the MSI-then-affinity order to guides and says what we have not measured.
 - Releases are tagged only after every check has passed on the commit they are built from, and the
   PowerShell Gallery package always holds the same file as the GitHub release.
 - Before a release is published, the script is now checked against the syntax and .NET types of Windows

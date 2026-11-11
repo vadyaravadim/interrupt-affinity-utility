@@ -8,9 +8,9 @@
 
 .COMPANYNAME
 
-.COPYRIGHT
+.COPYRIGHT Copyright (c) 2026 vadyaravadim
 
-.TAGS Windows Windows10 Windows11 Gaming InterruptAffinity IRQ DPC Latency MSI PCI Performance Tweak
+.TAGS Windows Windows10 Windows11 Gaming InterruptAffinity IRQ DPC Latency MSI PCI Performance Tweak PSEdition_Desktop PSEdition_Core
 
 .LICENSEURI https://github.com/vadyaravadim/interrupt-affinity-utility/blob/main/LICENSE
 
@@ -24,7 +24,7 @@
 
 .EXTERNALSCRIPTDEPENDENCIES
 
-.RELEASENOTES
+.RELEASENOTES https://github.com/vadyaravadim/interrupt-affinity-utility/blob/main/CHANGELOG.md
 
 .PRIVATEDATA
 
@@ -56,6 +56,24 @@
     state each device had before this tool first touched it.
     (-Reset deletes both values; if another tool wrote a policy you want
     back, only the undo files restore it.)
+
+.EXAMPLE
+    .\interrupt-affinity-utility.ps1
+
+    Double-click Run.bat, or right-click this file > Run with PowerShell.
+    No parameters needed - it elevates itself.
+
+.EXAMPLE
+    .\interrupt-affinity-utility.ps1 -Status
+
+.EXAMPLE
+    .\interrupt-affinity-utility.ps1 -ShowAll
+
+.EXAMPLE
+    .\interrupt-affinity-utility.ps1 -Reset
+
+.LINK
+    https://github.com/vadyaravadim/interrupt-affinity-utility
 #>
 [CmdletBinding()]
 param(
