@@ -37,6 +37,8 @@ irm https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest/d
 
 The script downloads itself to `%USERPROFILE%\interrupt-affinity-utility.ps1` (not a temp folder) on purpose: the `affinity_undo_*.reg` rollback files are written next to it and must survive automatic temp cleanup. An existing copy at that path that differs is kept as `.bak`. The `irm | iex` pipe itself takes no switches - run the saved copy instead, see [Optional switches](#optional-switches).
 
+**Check it before it runs:** download `interrupt-affinity-utility.ps1` from the [latest release](https://github.com/vadyaravadim/interrupt-affinity-utility/releases/latest), verify it as [SECURITY.md](SECURITY.md#verifying-a-release) shows, then run that file with `powershell -ExecutionPolicy Bypass -File .\interrupt-affinity-utility.ps1`.
+
 **From the PowerShell Gallery**, in PowerShell 7 (`pwsh`):
 
 ```powershell
@@ -202,7 +204,7 @@ Three usual reasons: (1) the device wasn't restarted — the policy is read at d
 
 ### Should I combine this with MSI mode?
 
-They're complementary: [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility) switches *how* a device delivers interrupts (message-signaled instead of shared lines); this utility controls *where* they're serviced. The registry keys literally sit next to each other. Typical order: enable MSI first, then pin affinity if you still see DPC latency spikes.
+They're complementary: [MSI Mode Utility](https://github.com/vadyaravadim/msi-mode-utility) switches *how* a device delivers interrupts (message-signaled instead of shared lines); this utility controls *where* they're serviced. The registry keys literally sit next to each other. Guides usually enable MSI first and pin affinity after it against DPC latency spikes that remain; we have not measured either against spikes.
 
 ### What about DevicePriority?
 
@@ -211,6 +213,10 @@ The same registry key also accepts a `DevicePriority` value (interrupt priority)
 ### Where are my NVMe drives?
 
 Hidden by the default filter on purpose: NVMe already spreads MSI-X interrupts across cores out of the box, and pinning them usually hurts. Use `-ShowAll` if you want to see them anyway.
+
+### How do I remove the script itself?
+
+Apply an undo file first if you want the old policies back (see [Reverting](#reverting)). Then delete what the script left: with the one-liner, `interrupt-affinity-utility.ps1`, an `interrupt-affinity-utility.ps1.bak` if there is one, and the `affinity_undo_*.reg` files and `affinity_undo_original.reg` in `%USERPROFILE%`; with the ZIP or a clone, the folder. From the PowerShell Gallery, the undo files sit in the folder `(Get-InstalledScript interrupt-affinity-utility).InstalledLocation` prints; delete them, then run `Uninstall-Script interrupt-affinity-utility`. The script installs nothing else.
 
 ## Related
 
