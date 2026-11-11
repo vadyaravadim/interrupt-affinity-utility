@@ -480,6 +480,9 @@ Write-Host "Undo files: $undoFile (reverts this run); $origFile (restores the pr
 
 $updated = 0
 $failed  = 0
+# A device can fail after its DevicePolicy went in (the mask write throws):
+# it is changed all the same, so the restart line keys off any write.
+$written = $false
 foreach ($d in $selected) {
     try {
         if ($Reset) {
@@ -496,6 +499,7 @@ foreach ($d in $selected) {
             # honored with this policy. REG_BINARY little endian, as documented.
             New-ItemProperty -Path $d.RegPath -Name 'DevicePolicy' `
                 -Value 4 -PropertyType DWord -Force | Out-Null
+            $written = $true
             New-ItemProperty -Path $d.RegPath -Name 'AssignmentSetOverride' `
                 -Value ([BitConverter]::GetBytes($mask)) -PropertyType Binary -Force | Out-Null
             Write-Host ("  [PIN {0}] {1}" -f $targetCores, $d.Name) -ForegroundColor Green
@@ -513,7 +517,7 @@ if ($failed) {
     # The undo file lists the failed devices too; reverting an unchanged value is a no-op.
     Write-Host "$failed device(s) failed - see errors above." -ForegroundColor Yellow
 }
-if ($updated) { Write-Host "Restart the device (disable/enable in Device Manager) or REBOOT for changes to take effect." -ForegroundColor Green }
+if ($updated -or $written) { Write-Host "Restart the device (disable/enable in Device Manager) or REBOOT for changes to take effect." -ForegroundColor Green }
 if ($updated -and -not $Reset) {
     Write-Host ""
     Write-Host "Useful? A star on GitHub helps others find it: https://github.com/vadyaravadim/interrupt-affinity-utility"

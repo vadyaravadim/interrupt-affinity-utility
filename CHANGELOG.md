@@ -25,7 +25,7 @@ section is empty or its compare link at the bottom is missing.
   edition is not supported. It now says so before the scan. Nothing was ever changed.
 - When every selected device failed to update, the run still ended with "Restart the device (disable/enable
   in Device Manager) or REBOOT for changes to take effect" although nothing had changed. That line now shows
-  only when at least one device was updated.
+  only when the run changed at least one device.
 
 ### Changed
 
