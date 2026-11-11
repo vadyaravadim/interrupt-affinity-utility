@@ -10,6 +10,14 @@ section is empty or its compare link at the bottom is missing.
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows Server Core the run stopped with a raw error after the device scan instead of saying the
+  edition is not supported. It now says so before the scan. Nothing was ever changed.
+- When every selected device failed to update, the run still ended with "Restart the device (disable/enable
+  in Device Manager) or REBOOT for changes to take effect" although nothing had changed. That line now shows
+  only when at least one device was updated.
+
 ### Changed
 
 - Releases are tagged only after every check has passed on the commit they are built from, and the
