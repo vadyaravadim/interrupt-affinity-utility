@@ -161,15 +161,14 @@ Describe 'whole-script runs with every device, registry and grid command mocked'
         Mock Set-ItemProperty { }
         Mock Remove-ItemProperty { }
         Mock Start-Sleep { }
-        $script:hostLines = [System.Collections.Generic.List[string]]::new()
-        Mock Write-Host { $script:hostLines.Add("$Object") }
+        Mock Write-Host { if ("$Object" -like 'ERROR:*') { "$Object" } }
     }
 
     It 'stops before the device scan on Windows Server Core' -Skip:(-not $isAdmin) {
         Mock Get-ItemProperty { [pscustomobject]@{ ServerCore = 1 } } -ParameterFilter { "$Path$LiteralPath" -like '*\Windows NT\CurrentVersion\Server\ServerLevels' }
         Mock Get-PnpDevice { }
-        & $copy
-        @($script:hostLines | Where-Object { $_ -like 'ERROR:*' }) | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
+        $output = & $copy
+        ($output | Where-Object { "$_" -like 'ERROR:*' }) -join "`n" | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
         Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Out-GridView is not available*' }
         Should -Invoke Get-PnpDevice -Times 0 -Exactly
     }
@@ -180,8 +179,8 @@ Describe 'whole-script runs with every device, registry and grid command mocked'
         Mock Out-GridView { [pscustomobject]@{ Name = 'Fake NIC'; Policy = 'Default'; Cores = '-'; DeviceID = 'PCI\VEN_FAKE&DEV_FAKE\0'; RegPath = 'Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\PCI\VEN_FAKE&DEV_FAKE\0\Device Parameters\Interrupt Management\Affinity Policy' } } -ParameterFilter { $Title -like 'Select devices*' }
         Mock Out-GridView { [pscustomobject]@{ CPU = 0; Type = 'Core' } } -ParameterFilter { $Title -like 'Select CPU core*' }
         Mock New-Item { throw 'registry write denied' }
-        & $copy
-        @($script:hostLines | Where-Object { $_ -like 'ERROR:*' }) | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
+        $output = & $copy
+        ($output | Where-Object { "$_" -like 'ERROR:*' }) -join "`n" | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
         Should -Invoke New-Item -Times 1 -Exactly
         Should -Invoke New-ItemProperty -Times 0 -Exactly
         Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Done. 0 of 1*' }
