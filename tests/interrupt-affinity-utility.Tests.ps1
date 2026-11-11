@@ -161,15 +161,15 @@ Describe 'whole-script runs with every device, registry and grid command mocked'
         Mock Set-ItemProperty { }
         Mock Remove-ItemProperty { }
         Mock Start-Sleep { }
-        Mock Write-Host { }
-        Mock Test-Path { Microsoft.PowerShell.Management\Test-Path @PesterBoundParameters }
+        $script:hostLines = [System.Collections.Generic.List[string]]::new()
+        Mock Write-Host { $script:hostLines.Add("$Object") }
     }
 
     It 'stops before the device scan on Windows Server Core' -Skip:(-not $isAdmin) {
         Mock Get-ItemProperty { [pscustomobject]@{ ServerCore = 1 } } -ParameterFilter { "$Path$LiteralPath" -like '*\Windows NT\CurrentVersion\Server\ServerLevels' }
         Mock Get-PnpDevice { }
         & $copy
-        Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter { "$Object" -like 'ERROR:*' }
+        @($script:hostLines | Where-Object { $_ -like 'ERROR:*' }) | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
         Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Out-GridView is not available*' }
         Should -Invoke Get-PnpDevice -Times 0 -Exactly
     }
@@ -181,7 +181,7 @@ Describe 'whole-script runs with every device, registry and grid command mocked'
         Mock Out-GridView { [pscustomobject]@{ CPU = 0; Type = 'Core' } } -ParameterFilter { $Title -like 'Select CPU core*' }
         Mock New-Item { throw 'registry write denied' }
         & $copy
-        Should -Invoke Write-Host -Times 0 -Exactly -ParameterFilter { "$Object" -like 'ERROR:*' }
+        @($script:hostLines | Where-Object { $_ -like 'ERROR:*' }) | Should -BeNullOrEmpty -Because 'the run must not end in the trap'
         Should -Invoke New-Item -Times 1 -Exactly
         Should -Invoke New-ItemProperty -Times 0 -Exactly
         Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { "$Object" -like 'Done. 0 of 1*' }
