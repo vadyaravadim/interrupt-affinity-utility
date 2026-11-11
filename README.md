@@ -112,7 +112,7 @@ It is also the standard server-side technique for network scaling — Microsoft 
 | | |
 |---|---|
 | **Windows** | 10, 11 (64-bit, up to 64 logical processors) |
-| **PowerShell** | Windows PowerShell 5.1 (ships with Windows 10/11); PowerShell 7 works too. Uses `Out-GridView`, which both have on Windows editions with a desktop and which is **not** available on Server Core. The script detects a missing `Out-GridView` and tells you what to do |
+| **PowerShell** | Windows PowerShell 5.1 (ships with Windows 10/11); PowerShell 7 works too. Uses `Out-GridView`, which both have on Windows editions with a desktop. Windows Server Core is **not** supported: the script says so and stops before the scan, changing nothing; `-Status` works there too |
 | **Rights** | Administrator (the script self-elevates via UAC); `-Status` needs none |
 
 ## How It Works

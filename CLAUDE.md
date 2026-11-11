@@ -6,10 +6,15 @@ driven by two `Out-GridView` pickers. Part of a family of six single-script Wind
 this layout: one `.ps1`, `Run.bat`, `PSScriptAnalyzerSettings.psd1`, and two thin workflows, `ci.yml` and
 `release.yml`, that call the family's shared pipeline in `vadyaravadim/latency-toolbox-ci`.
 
-**`Out-GridView` is a hard dependency and the check for it stays up front.** It exists only on Windows
-editions with a desktop - Server Core has none, while PowerShell 7 on a desktop edition does have it; failing
-early with instructions beats a raw `CommandNotFound` thrown halfway through a scan the user already
-waited on. `-Status` prints to the console, so it skips that check and the elevation.
+**`Out-GridView` is a hard dependency and the check for it stays up front; Windows Server Core is not
+supported (owner decision, 2026-11-11).** On Server Core the cmdlet resolves but cannot open its window
+(`Microsoft.PowerShell.GraphicalHost`), so a `Get-Command` check alone passed there and the run died in the
+`trap` after the scan. The check therefore also reads
+`HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Server\ServerLevels`: the key exists on every Windows
+Server and holds `Server-Gui-Shell` = 1 only with the desktop - hyphenated, as Microsoft's "Determining
+Whether Server Core Is Running" spells it; the `ServerGuiShell` of an older Microsoft table matches nothing.
+Failing before the scan beats a raw error after a scan the user already waited on. `-Status` prints to the
+console, so it skips that check and the elevation.
 
 **Only present devices are listed** (`Get-PnpDevice -PresentOnly`). `Enum\PCI` keeps the keys of removed
 hardware, and pinning those reports success while changing nothing.
@@ -67,9 +72,12 @@ pushed to `main`. The preview leg is not required: it only warns.
   would catch it. `PSUseCompatibleCommands` stays off: it flagged every Pester 5 parameter against the
   Pester 3.4 built into 5.1.
 - **The Pester gate runs every tracked `*.Tests.ps1` under Windows PowerShell 5.1 and the runner's `pwsh`,
-  and both legs block the release.** This repo has no test file yet, so the gate passes with a notice. A test
-  added later runs there too, so test code has to stay 5.1-safe: `Run.bat` and the elevated relaunch always
-  run 5.1.
+  and both legs block the release.** `tests/interrupt-affinity-utility.Tests.ps1` loads single functions from
+  the script's syntax tree and runs the `irm | iex` rerun against a stub script. Its whole-script tests run a
+  copy in `TestDrive` with every device, registry and grid command mocked, only when elevated, after proving
+  the mocks reach a script started with `&`; `Get-UndoLine` writes only under Pester's `TestRegistry:`; keep
+  new tests that way, contributors run them on their own PCs. Test code stays 5.1-safe: `Run.bat` and the
+  elevated relaunch always run 5.1.
 
 ## Release - the newest CHANGELOG section is the version
 
